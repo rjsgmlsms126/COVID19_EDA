@@ -1,0 +1,983 @@
+---
+title: "COVID19_EDA"
+author: "jonghyuk kim"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    fig_width: 14
+    fig_height: 10
+    fig.align : 'center'
+    toc: yes
+    number_sections : yes
+    code_folding: show
+---
+
+<hr>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE)
+```
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+
+필요 패키지
+```{r}
+rm(list=ls())
+#load packages
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(gridExtra)
+library(RColorBrewer)
+library(ggthemes)
+library(fmsb)
+library(corrplot)
+library(gridExtra)
+library(janitor)
+library(corrplot)
+library(DataExplorer)
+library(skimr)
+library(kableExtra)
+library(moonBook)
+library(data.table)
+library(scales)
+library(ggrepel)
+library(ggpubr)
+options(scipen=999) # turn-off scientific notation like 1e+48
+options(tibble.width = Inf)
+```
+
+<hr>
+
+<div style="margin-bottom:60px;">
+</div>
+
+# **COVID19 데이터**
+
+```{r}
+## 시간 정보
+time <- read.csv("Time.csv", na.strings=c(""))
+time_age <- read.csv("TimeAge.csv", na.strings=c(""))
+time_gender <- read.csv("TimeGender.csv", na.strings=c(""))
+time_province <- read.csv("TimeProvince.csv", na.strings=c(""))
+
+## 환자 정보
+patient_info <- read.csv("Patientinfo.csv", na.strings=c(""))
+patient_route <- read.csv("PatientRoute.csv", na.strings=c(""))
+
+## 감염 사건 정보
+case <- read.csv("Case.csv", na.strings=c(""))
+
+## 지역 정보
+region <- read.csv("Region.csv", na.strings=c(""))
+
+## 검색 트렌드
+search_trend <- read.csv("SearchTrend.csv", na.strings=c(""))
+
+## 서울 지역 정보
+seoul_floating <- read.csv("SeoulFloating.csv", na.strings=c(""))
+
+## 날씨 정보
+weather <- read.csv("Weather.csv", na.strings=c(""))
+```
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Time Information {.tabset .tabset-fade .tabset-pills}
+
+
+### `Time overall`
+
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(time,
+          caption = "전반적인 time information data",
+          filter='top')
+```
+
+```{r, fig.height=13}
+time <- time %>% mutate(date = as.POSIXct(date))
+
+lims <- as.POSIXct(strptime(c("2020-01-18","2020-03-23"), format = "%Y-%m-%d"))
+g1 <- time %>% 
+  gather(key=type, value=accumulation, 3:7) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_rect(aes(xmin=as.POSIXct("2020-02-19"), 
+                xmax=as.POSIXct("2020-03-23"),
+                ymin=-Inf, 
+                ymax=15000), fill="khaki", alpha=.05) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  scale_color_brewer(palette = "Dark2") +
+  geom_label_repel(aes(label=ifelse(date==as.POSIXct("2020-03-11") & accumulation>7500 & type == "confirmed", "Overlapped! Zoom in this box!", "")),
+    fontface='bold', size=4,
+    color='#0b421a',
+    segment.color='grey50', 
+    force=20,
+    alpha=.7) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="1 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13)) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프')
+
+lims <- as.POSIXct(strptime(c("2020-02-19","2020-03-23"), format = "%Y-%m-%d"))
+g2 <- time %>% 
+  gather(key=type, value=accumulation, 3:7) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_rect(aes(xmin=as.POSIXct("2020-03-07"), 
+                xmax=as.POSIXct("2020-03-23"),
+                ymin=-Inf, 
+                ymax=4000), fill="skyblue", alpha=.05) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="1 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  scale_color_brewer(palette = "Dark2") +
+  geom_label_repel(aes(label=ifelse(date==as.POSIXct("2020-03-16") & accumulation>1100 & type == "released", "Zoom in this box!", "")),
+    fontface='bold', size=4,
+    color='#0b421a',
+    segment.color='grey50', 
+    force=160,
+    alpha=.7) +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13)) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프',
+       subtitle = "Zoom in over plot's yellow box") +
+  ylim(c(0,10000))
+
+lims <- as.POSIXct(strptime(c("2020-03-06","2020-03-23"), format = "%Y-%m-%d"))
+g3 <- time %>% 
+  gather(key=type, value=accumulation, 3:7) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="1 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13)) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프',
+       subtitle = "Zoom in over plot's blue box") +
+  ylim(c(0,4000))
+
+grid.arrange(g1, g2, g3, nrow=3)
+```
+
+<div style="margin-bottom:90px;">
+</div>
+
+### `Time age`
+
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(time_age,
+          caption = "time with age data",
+          filter='top')
+```
+
+```{r}
+time_age <- time_age %>% mutate(date = as.POSIXct(date))
+lims <- as.POSIXct(strptime(c("2020-03-02","2020-03-22"), format = "%Y-%m-%d"))
+
+time_age %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  facet_wrap(~age, scales='free', ncol=3) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="1 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 14),
+        strip.text.x = element_text(size = 13, face = "bold")) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프',
+       subtitle = "나이대별 차이, y축 확인")
+```
+
+```{r, fig.height=16}
+a <- time_age %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=type, y= 10 + accumulation, fill=age)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_brewer(palette='Paired') +
+  scale_y_log10() +
+  labs(x="type", y="", 
+       title="나이별 누적 빈도 수 차이 그래프",
+       subtitle = "y = log(10+accumulation)") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold"))
+
+
+b <- time_age %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=age, y=accumulation, fill=type)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Age", y="", 
+       title="Distribution of confirmed vs deceased per Age") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) +
+  coord_flip()
+
+grid.arrange(a,b, ncol=1)
+```
+
+<div style="margin-bottom:90px;">
+</div>
+
+### `Time gender`
+
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(time_age,
+          caption = "time with gender data",
+          filter='top')
+```
+
+```{r}
+time_gender <- time_gender %>% mutate(date = as.POSIXct(date))
+lims <- as.POSIXct(strptime(c("2020-03-02","2020-03-22"), format = "%Y-%m-%d"))
+
+time_gender %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  facet_wrap(~sex, ncol=3) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="1 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 14),
+        strip.text.x = element_text(size = 13, face = "bold")) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프',
+       subtitle = "성별 차이")
+```
+
+```{r}
+c <- time_gender %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=type, y= accumulation, fill=sex)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_brewer(palette='Paired') +
+  scale_y_log10() +
+  labs(x="type", y="", 
+       title="성별 누적 빈도 수 차이 그래프",
+       subtitle = "y = log(10+accumulation)") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold"))
+
+
+d <- time_gender %>% 
+  gather(key=type, value=accumulation, 4:5) %>% 
+  ggplot(aes(x=sex, y=accumulation, fill=type)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Sex", y="", 
+       title="Distribution of confirmed vs deceased per Sex") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold"))
+
+grid.arrange(c,d, ncol=2)
+```
+
+<div style="margin-bottom:90px;">
+</div>
+
+### `Time province`
+
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(time_age,
+          caption = "time with province data",
+          filter='top')
+```
+
+```{r, fig.height=16}
+time_province <- time_province %>% mutate(date = as.POSIXct(date))
+lims <- as.POSIXct(strptime(c("2020-01-20","2020-03-22"), format = "%Y-%m-%d"))
+
+time_province %>% 
+  gather(key=type, value=accumulation, 4:6) %>% 
+  ggplot(aes(x=date, y=accumulation)) +
+  geom_line(aes(col=type), alpha=.3, size=2) +
+  facet_wrap(~province, scales='free', ncol=3) +
+  theme_fivethirtyeight() + 
+  scale_x_datetime(limits =lims, date_breaks="5 day", 
+                   labels = date_format("%Y-%m-%d")) +
+  scale_color_brewer(palette = "Dark2") +
+  theme(axis.text.x = element_text(angle=90),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 14),
+        strip.text.x = element_text(size = 13, face = "bold")) +
+  labs(title = '시간 흐름에 따른 타입별 누적 흐름 그래프',
+       subtitle = "지역별 차이, y축 확인")
+```
+
+```{r, fig.height=16}
+e <- time_province %>% 
+  gather(key=type, value=accumulation, 4:6) %>% 
+  ggplot(aes(x=type, y=10+accumulation, fill=province)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_fill_brewer(palette='Paired') +
+  scale_y_log10() +
+  labs(x="type", y="", 
+       title="지역별 누적 빈도 수 차이 그래프",
+       subtitle = "y = log(10+accumulation)") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold"))
+
+
+f <- time_province %>% 
+  gather(key=type, value=accumulation, 4:6) %>% 
+  ggplot(aes(x=province, y=accumulation, fill=type)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Province", y="", 
+       title="Distribution of confirmed vs deceased per Province") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) +
+  coord_flip()
+
+grid.arrange(e,f, ncol=1)
+```
+
+## Patient Information {.tabset .tabset-fade .tabset-pills}
+
+### `Patient overall`
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(patient_info,
+          caption = "patient information data",
+          filter='top')
+```
+
+```{r}
+# 파생변수 생성
+# 1. 확진 날짜 - 증상 발생 날짜 --> delayed_date
+# 2. 완치 날짜 - 확진 날짜 --> treated_date
+# 3. 사망 날짜 - 확진 날짜 --> non_treated_date
+
+patient_info <- patient_info %>% 
+  mutate(symptom_onset_date = as.POSIXct(symptom_onset_date),
+         confirmed_date = as.POSIXct(confirmed_date),
+         released_date = as.POSIXct(released_date),
+         deceased_date = as.POSIXct(deceased_date)) %>% 
+  mutate(delayed_date = difftime(confirmed_date, symptom_onset_date, units = "days"),
+         treated_date = difftime(released_date, confirmed_date, units = "days"),
+         non_treated_date = difftime(deceased_date, confirmed_date, units = "days")) 
+
+patient_info %>% 
+  gather(key = case, value = days, 19:21) %>% 
+  ggplot(aes(x=case, y=days)) +
+    geom_rect(aes(xmin=-Inf, 
+                xmax="non_treated_date",
+                ymin=10, 
+                ymax=30), fill="lightskyblue", alpha=0.01) + 
+    geom_label_repel(aes(label=ifelse(days>=26 & case == "delayed_date", "Check! this sector is outlier!", "")),
+    fontface='bold', size=4,
+    color='#0b421a',
+    segment.color='grey50', 
+    force=160,
+    alpha=.7) +
+  geom_rect(aes(xmin="non_treated_date", 
+                xmax=Inf,
+                ymin=20, 
+                ymax=35), fill="tan", alpha=0.01) + 
+    geom_label_repel(aes(label=ifelse(days>=30 & case == "treated_date", "Check! this sector is outlier!", "")),
+    fontface='bold', size=4,
+    color='lightsalmon3',
+    segment.color='grey50', 
+    force=150,
+    alpha=.7) +
+  geom_jitter(width = 0.05, height = 0) +
+  geom_boxplot(aes(col=case), alpha=.8) +
+  scale_color_brewer(palette = "Accent") +
+  labs(x="", 
+       title="Distribution of delayed_date vs treated_date vs non_treated_date") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13)) 
+
+```
+
+```{r}
+patient_info$delayed_date %>% quantile(na.rm=T) %>% 
+  as.data.frame() %>% rename(delayed_date = ".") %>% 
+  kable(caption = "Quantile of delayed_date") %>% kable_styling()
+# delayed_date 분위 수에 따라 그룹을 나눠보자!
+
+patient_info <- patient_info %>% 
+  # gather(key = case, value = days, 19:21, na.rm = T) %>%
+  mutate(delayed_group = ifelse(delayed_date >= 6,"late",
+                                ifelse(delayed_date < 6 & delayed_date >= 2, "normal",
+                                       ifelse(delayed_date < 2, "early", NA))))
+
+a <- patient_info %>% 
+  # filter(case == "delayed_date") %>% 
+  ggplot(aes(x=delayed_group, y= 1 + contact_number)) +
+  geom_point() +
+  geom_boxplot(aes(col=delayed_group, fill=delayed_group), alpha=.4) + 
+  theme_fivethirtyeight() +
+  scale_color_brewer(palette='Dark2') +
+  scale_fill_brewer(palette='Dark2') +
+  theme(axis.title = element_text()) + 
+  labs(y = "log(1+contact_N)") +
+  scale_y_log10()
+
+
+b <- patient_info %>% 
+  # filter(case == "delayed_date") %>% 
+  group_by(age, delayed_group) %>% 
+  summarise(N=n()) %>% na.omit() %>% 
+  ggplot(aes(x=age, y=N, fill=delayed_group)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Age", y="", 
+       title="Distribution of early vs normal vs late per age") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) 
+
+c <- patient_info %>% 
+  # filter(case == "delayed_date") %>% 
+  group_by(sex, delayed_group) %>% 
+  summarise(N=n()) %>% na.omit() %>% 
+  ggplot(aes(x=sex, y=N, fill=delayed_group)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Sex", y="", 
+       title="Distribution of early vs normal vs late per sex") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) 
+
+
+ggarrange(a,
+          ggarrange(b, c, ncol = 2, labels = c("B", "C")),
+          nrow = 2, 
+          labels = "A")
+```
+
+
+```{r}
+patient_info$treated_date %>% quantile(na.rm=T) %>% 
+  as.data.frame() %>% rename(treated_date = ".") %>% 
+  kable(caption = "Quantile of treated_date") %>% kable_styling()
+
+# treated_date 분위 수에 따라 그룹을 나눠보자!
+
+patient_info <- patient_info %>% 
+  mutate(treated_group = ifelse(treated_date >= 17,"late",
+                                ifelse(treated_date < 17 & treated_date >= 11, "normal",
+                                       ifelse(treated_date < 11, "early", NA))))
+
+a <- patient_info %>% 
+  ggplot(aes(x=treated_group, y= 1 + contact_number)) +
+  geom_point() +
+  geom_boxplot(aes(col=treated_group, fill=treated_group), alpha=.4) + 
+  theme_fivethirtyeight() +
+  scale_color_brewer(palette='Dark2') +
+  scale_fill_brewer(palette='Dark2') +
+  theme(axis.title = element_text()) + 
+  labs(y = "log(1+contact_N)") +
+  scale_y_log10()
+
+
+b <- patient_info %>% 
+  group_by(age, treated_group) %>% 
+  summarise(N=n()) %>% na.omit() %>% 
+  ggplot(aes(x=age, y=N, fill=treated_group)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Age", y="", 
+       title="Distribution of early vs normal vs late per age") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) 
+
+c <- patient_info %>% 
+  group_by(sex, treated_group) %>% 
+  summarise(N=n()) %>% na.omit() %>% 
+  ggplot(aes(x=sex, y=N, fill=treated_group)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_brewer(palette='Dark2') +
+  labs(x="Sex", y="", 
+       title="Distribution of early vs normal vs late per sex") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) 
+
+
+ggarrange(a,
+          ggarrange(b, c, ncol = 2, labels = c("B", "C")),
+          nrow = 2, 
+          labels = "A")
+```
+
+```{r}
+library(igraph)
+library(networkD3)
+
+patient_infection <- patient_info %>% select(infected_by, patient_id) %>% na.omit()
+
+
+# Reshape link(edge) data
+link <- patient_infection %>% 
+  group_by(infected_by, patient_id) %>% 
+  summarise(Link_Freq = n()) 
+A <- patient_infection %>% group_by(infected_by) %>% summarise(N1 = n())
+B <- patient_infection %>% group_by(patient_id) %>% summarise(N2 = n())
+AB <- full_join(A,B, by = c("infected_by" = "patient_id"))
+AB %<>% mutate(N1 = ifelse(is.na(N1), 0, N1)) %>% 
+  mutate(N2 = ifelse(is.na(N2), 0, N2)) %>% 
+  mutate(Size = N1 + N2) %>% select(infected_by, Size)
+
+link_1 <- left_join(link, AB, by = c("infected_by" = "infected_by"))
+link_1 %<>% rename(A = infected_by, B = patient_id, A_Freq = Size)
+link_2 <- left_join(link_1, AB, by = c("B" = "infected_by"))
+link_2 %<>% rename(B_Freq = Size) 
+link_2 %<>% 
+  mutate(Lift_index = (Link_Freq) / (A_Freq * B_Freq / nrow(patient_infection)))
+
+# rm(list=setdiff(ls(), c("link_2")))
+
+link_2 %<>% ungroup()
+
+# Reshape Node(vertex) data filtered link data
+A <- link_2 %>% select(Node = A, Size = A_Freq)
+A$B <- NULL
+A %<>% ungroup()
+B <- link_2 %>% select(Node = B, Size = B_Freq)
+B$A <- NULL
+B %<>% ungroup() 
+Node_patient <- rbind(A,B)
+Node_patient <- unique(Node_patient[c("Node", "Size")])
+link_patient <- link_2
+```
+
+```{r}
+infect_case <- patient_info %>% select(patient_id, infection_case) %>% na.omit() %>% mutate(infection_case = as.character(infection_case))
+Node_patient <- left_join(Node_patient, infect_case, by=c("Node" = "patient_id"))
+Node_patient <- Node_patient %>% mutate(infection_case = ifelse(is.na(infection_case), "etc", infection_case))
+
+net_patient <- graph_from_data_frame(d=link_patient, vertices = Node_patient, directed=T)
+
+
+# more complex graph
+patient_force_link <- link_patient
+patient_force_link$Lift_index = 1
+patient_force_link %<>% select(source = A, target = B, value = Lift_index)
+
+patient_force_node <- Node_patient
+patient_force_node %<>% select(name = Node, group = infection_case, size = Size)
+
+patient_force_node %<>% mutate(numbering = 0:(nrow(patient_force_node)-1))
+
+# link data reshape(sankey)
+aaa <- right_join(patient_force_node, patient_force_link, by = c("name" = "source"))
+aaa %<>% select(-name) %>% rename(source = numbering)
+bbb <- right_join(patient_force_node, aaa, by = c("name" = "target"))
+bbb %<>% select(-name) %>% rename(target = numbering)
+new_link_patient <- bbb %>% select(source, target, value)
+
+# numbering 필요없음
+patient_force_node %<>% select(-numbering)
+
+# man_force_node
+# new_link_man
+# 
+# x = man_force_node$size
+# man_force_node$size = x*0.001
+# 
+# y = new_link_man$value
+# new_link_man$value = y*0.05
+
+forceNetwork(Links = new_link_patient, 
+             Nodes = patient_force_node,
+             Source = "source", 
+             Target = "target", 
+             Value = "value",
+             NodeID = "name", 
+             Group = "group",
+             Nodesize = "size",
+             height = 1500,
+             width = 2000,
+             charge = -3,
+             opacity = 1,
+             opacityNoHover = T,
+             fontSize = 13,
+             zoom = T,
+             legend = T,
+             arrows = T) 
+```
+
+```{r}
+age_case <- patient_info %>% select(patient_id, age) %>% na.omit() %>% mutate(age = as.character(age))
+Node_patient <- left_join(Node_patient, age_case, by=c("Node" = "patient_id"))
+Node_patient <- Node_patient %>% mutate(age = ifelse(is.na(age), "etc", age))
+
+net_patient <- graph_from_data_frame(d=link_patient, vertices = Node_patient, directed=T)
+
+
+# more complex graph
+patient_force_link <- link_patient
+patient_force_link$Lift_index = 1
+patient_force_link %<>% select(source = A, target = B, value = Lift_index)
+
+patient_force_node <- Node_patient
+patient_force_node %<>% select(name = Node, group = age, size = Size)
+
+patient_force_node %<>% mutate(numbering = 0:(nrow(patient_force_node)-1))
+
+# link data reshape(sankey)
+aaa <- right_join(patient_force_node, patient_force_link, by = c("name" = "source"))
+aaa %<>% select(-name) %>% rename(source = numbering)
+bbb <- right_join(patient_force_node, aaa, by = c("name" = "target"))
+bbb %<>% select(-name) %>% rename(target = numbering)
+new_link_patient <- bbb %>% select(source, target, value)
+
+# numbering 필요없음
+patient_force_node %<>% select(-numbering)
+
+# man_force_node
+# new_link_man
+# 
+# x = man_force_node$size
+# man_force_node$size = x*0.001
+# 
+# y = new_link_man$value
+# new_link_man$value = y*0.05
+
+forceNetwork(Links = new_link_patient, 
+             Nodes = patient_force_node,
+             Source = "source", 
+             Target = "target", 
+             Value = "value",
+             NodeID = "name", 
+             Group = "group",
+             Nodesize = "size",
+             height = 1500,
+             width = 2000,
+             charge = -3,
+             opacity = 1,
+             opacityNoHover = T,
+             fontSize = 13,
+             zoom = T,
+             legend = T,
+             arrows = T) 
+```
+
+```{r}
+sex_case <- patient_info %>% select(patient_id, sex) %>% na.omit() %>% mutate(sex = as.character(sex))
+Node_patient <- left_join(Node_patient, sex_case, by=c("Node" = "patient_id"))
+Node_patient <- Node_patient %>% mutate(sex = ifelse(is.na(sex), "etc", sex))
+
+net_patient <- graph_from_data_frame(d=link_patient, vertices = Node_patient, directed=T)
+
+
+# more complex graph
+patient_force_link <- link_patient
+patient_force_link$Lift_index = 1
+patient_force_link %<>% select(source = A, target = B, value = Lift_index)
+
+patient_force_node <- Node_patient
+patient_force_node %<>% select(name = Node, group = sex, size = Size)
+
+patient_force_node %<>% mutate(numbering = 0:(nrow(patient_force_node)-1))
+
+# link data reshape(sankey)
+aaa <- right_join(patient_force_node, patient_force_link, by = c("name" = "source"))
+aaa %<>% select(-name) %>% rename(source = numbering)
+bbb <- right_join(patient_force_node, aaa, by = c("name" = "target"))
+bbb %<>% select(-name) %>% rename(target = numbering)
+new_link_patient <- bbb %>% select(source, target, value)
+
+# numbering 필요없음
+patient_force_node %<>% select(-numbering)
+
+# man_force_node
+# new_link_man
+# 
+# x = man_force_node$size
+# man_force_node$size = x*0.001
+# 
+# y = new_link_man$value
+# new_link_man$value = y*0.05
+
+forceNetwork(Links = new_link_patient, 
+             Nodes = patient_force_node,
+             Source = "source", 
+             Target = "target", 
+             Value = "value",
+             NodeID = "name", 
+             Group = "group",
+             Nodesize = "size",
+             height = 1500,
+             width = 2000,
+             charge = -3,
+             opacity = 1,
+             opacityNoHover = T,
+             fontSize = 13,
+             zoom = T,
+             legend = T,
+             arrows = T) 
+```
+
+```{r}
+province_case <- patient_info %>% select(patient_id, province) %>% na.omit() %>% mutate(province = as.character(province))
+Node_patient <- left_join(Node_patient, province_case, by=c("Node" = "patient_id"))
+Node_patient <- Node_patient %>% mutate(province = ifelse(is.na(province), "etc", province))
+
+net_patient <- graph_from_data_frame(d=link_patient, vertices = Node_patient, directed=T)
+
+
+# more complex graph
+patient_force_link <- link_patient
+patient_force_link$Lift_index = 1
+patient_force_link %<>% select(source = A, target = B, value = Lift_index)
+
+patient_force_node <- Node_patient
+patient_force_node %<>% select(name = Node, group = province, size = Size)
+
+patient_force_node %<>% mutate(numbering = 0:(nrow(patient_force_node)-1))
+
+# link data reshape(sankey)
+aaa <- right_join(patient_force_node, patient_force_link, by = c("name" = "source"))
+aaa %<>% select(-name) %>% rename(source = numbering)
+bbb <- right_join(patient_force_node, aaa, by = c("name" = "target"))
+bbb %<>% select(-name) %>% rename(target = numbering)
+new_link_patient <- bbb %>% select(source, target, value)
+
+# numbering 필요없음
+patient_force_node %<>% select(-numbering)
+
+# man_force_node
+# new_link_man
+# 
+# x = man_force_node$size
+# man_force_node$size = x*0.001
+# 
+# y = new_link_man$value
+# new_link_man$value = y*0.05
+
+forceNetwork(Links = new_link_patient, 
+             Nodes = patient_force_node,
+             Source = "source", 
+             Target = "target", 
+             Value = "value",
+             NodeID = "name", 
+             Group = "group",
+             Nodesize = "size",
+             height = 1500,
+             width = 2000,
+             charge = -3,
+             opacity = 1,
+             opacityNoHover = T,
+             fontSize = 13,
+             zoom = T,
+             legend = T,
+             arrows = T) 
+```
+
+
+### `Patient route`
+```{r, eval=T, echo=FALSE}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(patient_route,
+          caption = "patient route data",
+          filter='top')
+```
+
+```{r}
+patient_route %>% View()
+```
+
+
+
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Case Information
+```{r}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(case,
+          caption = "case data",
+          filter='top')
+```
+
+```{r}
+all <- case %>% 
+  group_by(group) %>% 
+  summarise(N=n()) %>% 
+  ggplot(aes(x=group, y=N, fill=group)) +
+  geom_bar(stat="identity") +
+  scale_fill_brewer(palette='Accent') +
+  geom_text(aes(label=N), vjust=1.2) +
+  labs(x="Group or Not", y="",
+       title = "Infection Case",
+       subtitle="Group or Not") +
+  theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 13),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold")) 
+
+each_region <- case %>% 
+  group_by(province, group) %>% 
+  summarise(N=n()) %>% 
+  ggplot(aes(x=group, y=N, fill=group)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~ province, ncol=4) +
+  scale_fill_brewer(palette='Accent') +
+  geom_text(aes(label=N), vjust=1.2) +
+  labs(x="Group or Not", y="",
+       title = "Infection Case",
+       subtitle="Group or Not") +
+  # theme_fivethirtyeight() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 13),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 12, face = "bold"),
+        strip.text.x = element_text(size = 8, face = "bold")) 
+
+grid.arrange(all, each_region, nrow=2)
+```
+
+```{r}
+province_name <- case$province %>% unique()
+aa <- list()
+cnt <- 0
+
+for (k in province_name[1:9]) {
+  cnt <- cnt+1
+  aa[[cnt]] <- case %>% 
+  filter(province == k) %>% 
+  filter(city != "-") %>% 
+  ggplot(aes(reorder(x= infection_case, -confirmed), y=confirmed, fill=infection_case)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~city) +
+  coord_flip() +
+  ggtitle(paste0("Region : ", k))
+}
+
+do.call(grid.arrange, c(aa, ncol=4))
+```
+
+```{r}
+case %>% 
+  group_by(infection_case) %>% 
+  summarise(confirmed = sum(confirmed)) %>% 
+  ggplot(aes(reorder(x= infection_case, confirmed), y=confirmed, fill=infection_case)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  geom_text(aes(label=confirmed)) +
+  labs(title = "Case") +
+  theme_fivethirtyeight() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 13),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", size = 13),
+        axis.text.x = element_text(size = 8, face = "bold"))
+```
+
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Region Information
+```{r}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(region,
+          caption = "Region data",
+          filter='top')
+```
+
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Search Information
+```{r}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(search_trend,
+          caption = "search_trend data",
+          filter='top')
+```
+
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Seoul Floating Information
+```{r}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(seoul_floating,
+          caption = "seoul_floating data",
+          filter='top')
+```
+
+
+
+<div style="margin-bottom:90px;">
+</div>
+
+## Weather Information
+```{r}
+library(DT)
+options(DT.options = list(pageLength=5))
+
+datatable(weather,
+          caption = "weather data",
+          filter='top')
+```
