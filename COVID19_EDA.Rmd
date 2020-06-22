@@ -1,17 +1,3 @@
----
-title: "COVID19_EDA"
-author: "jonghyuk kim"
-date: "`r Sys.Date()`"
-output: 
-  html_document:
-    fig_width: 14
-    fig_height: 10
-    fig.align : 'center'
-    toc: yes
-    number_sections : yes
-    code_folding: show
----
-
 <hr>
 
 ```{r setup, include=FALSE}
